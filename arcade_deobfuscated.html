@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <!-- Arcade navigation styles -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/style.css">
+
+  <!-- Font Awesome icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- Navigation bar -->
+<ul class="navbar">
+
+  <!-- Home -->
+  <li>
+    <a aria-label="Home"
+       onclick="changePageContent('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/home.html', () => {
+         appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/home.js', () => {
+           if (typeof displayRandomQuote === 'function') {
+             displayRandomQuote();
+           }
+         });
+         appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/customization.js');
+       });">
+      <i class="fas fa-home nav-icon"></i> Home
+    </a>
+  </li>
+
+  <!-- Games -->
+  <li>
+    <a aria-label="Games"
+       onclick="changePageContent('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/games.html', () => {
+         appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/games.js', () => {
+           if (typeof fetchGames === 'function') {
+             fetchGames('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/games.json');
+           }
+         });
+         appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/customization.js');
+       });">
+      <i class="fas fa-gamepad nav-icon"></i> Games
+    </a>
+  </li>
+
+  <!-- Apps -->
+  <li>
+    <a aria-label="Apps"
+       onclick="changePageContent('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/apps.html', () => {
+         appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/games.js', () => {
+           if (typeof fetchGames === 'function') {
+             fetchGames('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/apps.json');
+           }
+         });
+         appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/customization.js');
+       });">
+      <i class="fas fa-mobile-alt nav-icon"></i> Apps
+    </a>
+  </li>
+
+  <!-- Settings -->
+  <li>
+    <a aria-label="Settings"
+       onclick="changePageContent('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/settings.html');
+                appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/customization.js');">
+      <i class="fas fa-cog nav-icon"></i> Settings
+    </a>
+  </li>
+
+  <!-- Fullscreen -->
+  <li>
+    <a aria-label="Fullscreen" onclick="triggerFullscreen()">
+      <i class="fas fa-expand nav-icon"></i> Fullscreen
+    </a>
+  </li>
+
+</ul>
+
+<!-- Main Content Container -->
+<div id="content-container" class="content-container"></div>
+
+<!-- Game Iframe -->
+<!-- Game Iframe -->
+<iframe id="Game" frameborder="0" allow="fullscreen"></iframe>
+
+<!-- Pixelated Loading Spinner -->
+<div id="spinner">
+  <div class="spinner-icon"></div>
+</div>
+
+<script>
+
+  // ─── Page Content Loader ───────────────────────────────────────────────────
+
+  /**
+   * Fetches a URL via XHR (with a cache-busting query param),
+   * shows/hides the spinner, and invokes callback(responseText) on success.
+   */
+  function loadPageContent(url, callback) {
+    const xhttp = new XMLHttpRequest();
+
+    // Show spinner
+    document.getElementById('spinner').style.display = 'flex';
+
+    const urlWithNoCache = url + (url.includes('?') ? '&' : '?') + 'nocache=' + new Date().getTime();
+
+    xhttp.onreadystatechange = function () {
+      if (this.readyState === 4) {
+        // Hide spinner after request completes
+        document.getElementById('spinner').style.display = 'none';
+
+        if (this.status === 200) {
+          callback(this.responseText);
+        } else {
+          console.error('Failed to load:', url);
+        }
+      }
+    };
+
+    xhttp.open("GET", urlWithNoCache, true);
+    xhttp.send();
+  }
+
+
+  // ─── Change page content (renders into #content-container) ───────────────
+
+  /**
+   * Loads HTML from url, injects it into #content-container,
+   * hides the game iframe, then optionally runs callback().
+   */
+  function changePageContent(url, callback = null) {
+    loadPageContent(url, function (content) {
+      const container = document.getElementById('content-container');
+      container.innerHTML = content;
+
+      // Reset game iframe
+      const iframe = document.getElementById("Game");
+      iframe.src = "about:blank";
+
+      // Run any extra logic after content is loaded
+      if (callback) callback();
+    });
+
+    updateActiveLink(url);
+
+    // Hide the iframe, show the content container
+    document.getElementById("Game").style.display = "none";
+    document.getElementById('content-container').style.display = 'block';
+  }
+
+
+  // ─── Change iframe content ────────────────────────────────────────────────
+
+  /**
+   * Directly sets the game iframe src and hides the content container.
+   */
+  function changeIframeContent(page) {
+    document.getElementById('Game').src = page;
+    updateActiveLink(page);
+    document.getElementById('content-container').style.display = 'none'; // Hide content-container
+  }
+
+
+  // ─── Load content as Blob into iframe ────────────────────────────────────
+
+  /**
+   * Fetches url, wraps the response in a Blob URL, loads it into the iframe.
+   */
+  function loadBlobContent(url) {
+    loadPageContent(url, function (content) {
+      var blob = new Blob([content], { type: 'text/html' });
+      var iframe = document.getElementById('Game');
+      iframe.src = URL.createObjectURL(blob);
+      updateActiveLink(url);
+
+      // Hide content-container, show iframe
+      document.getElementById('content-container').style.display = 'none';
+      document.getElementById("Game").style.display = "block";
+    });
+  }
+
+
+  // ─── Fullscreen trigger ───────────────────────────────────────────────────
+
+  /**
+   * Requests fullscreen on the content-container if it's visible,
+   * otherwise requests fullscreen on the game iframe.
+   * Handles vendor-prefixed APIs for Firefox, Chrome/Safari/Opera, IE/Edge.
+   */
+  function triggerFullscreen() {
+    const contentContainer = document.querySelector('.content-container');
+    const iframe = document.getElementById('Game');
+
+    // Check if the content container is visible
+    const isContentVisible = contentContainer &&
+      contentContainer.offsetWidth > 0 &&
+      contentContainer.offsetHeight > 0;
+
+    if (isContentVisible) {
+      // Make content-container fullscreen
+      if (contentContainer.requestFullscreen) {
+        contentContainer.requestFullscreen();
+      } else if (contentContainer.mozRequestFullScreen) {       // Firefox
+        contentContainer.mozRequestFullScreen();
+      } else if (contentContainer.webkitRequestFullscreen) {   // Chrome, Safari, Opera
+        contentContainer.webkitRequestFullscreen();
+      } else if (contentContainer.msRequestFullscreen) {       // IE/Edge
+        contentContainer.msRequestFullscreen();
+      }
+    } else if (iframe) {
+      // Make the game iframe fullscreen
+      if (iframe.requestFullscreen) {
+        iframe.requestFullscreen();
+      } else if (iframe.mozRequestFullScreen) {                // Firefox
+        iframe.mozRequestFullScreen();
+      } else if (iframe.webkitRequestFullscreen) {             // Chrome, Safari, Opera
+        iframe.webkitRequestFullscreen();
+      } else if (iframe.msRequestFullscreen) {                 // IE/Edge
+        iframe.msRequestFullscreen();
+      }
+    }
+  }
+
+
+  // ─── Append external script ───────────────────────────────────────────────
+
+  /**
+   * Dynamically appends a <script> tag to the body.
+   * Optionally calls callback() once it loads.
+   */
+  function appendScript(url, callback = null) {
+    const script = document.createElement('script');
+    script.src = url;
+    script.type = 'text/javascript';
+    script.onload = () => {
+      if (callback) callback();
+    };
+    script.onerror = () => {
+      // silently swallow load errors
+    };
+    document.body.appendChild(script);
+  }
+
+
+  // ─── Load the Games menu ──────────────────────────────────────────────────
+
+  function loadGamesmenu() {
+    changePageContent(
+      'https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/games.html',
+      () => {
+        appendScript(
+          'https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/games/games.js',
+          () => {
+            if (typeof fetchGames === 'function') {
+              fetchGames();
+            }
+          }
+        );
+        appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/customization.js');
+      }
+    );
+  }
+
+
+  // ─── Update active nav link ───────────────────────────────────────────────
+
+  /**
+   * Removes 'active' class from all nav links, then adds it to the link
+   * whose onclick attribute contains the given url.
+   */
+  function updateActiveLink(url) {
+    document.querySelectorAll('ul li a').forEach(link => {
+      link.classList.remove('active');
+    });
+
+    const activeLink = document.querySelector(`a[onclick*="${url}"]`);
+    if (activeLink) {
+      activeLink.classList.add('active');
+      document.getElementById("Game").style.display = "block"; // Show the iframe
+    }
+  }
+
+
+  // ─── Initialisation ───────────────────────────────────────────────────────
+
+  // Load the home page on startup
+  changePageContent(
+    'https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/home.html',
+    () => {
+      appendScript(
+        'https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/home.js',
+        () => {
+          if (typeof displayRandomQuote === 'function') {
+            displayRandomQuote();
+          }
+        }
+      );
+      appendScript('https://cdn.jsdelivr.net/npm/@arcade-v/arcade_v/navigation/customization.js');
+    }
+  );
+
+  // Set default localStorage values if not already set
+  if (localStorage.getItem("faviconSrc") == null) {
+    localStorage.setItem('faviconSrc', 'https://gitlab.com/@arcade-/arcade_v_images/-/raw/main/favicon/logo.png');
+  }
+  if (localStorage.getItem("pageTitle") == null) {
+    localStorage.setItem('pageTitle', 'Arcade 5');
+  }
+  if (localStorage.getItem("userFont") == null) {
+    localStorage.setItem('userFont', 'Pixelify Sans');
+  }
+
+</script>
+
+</body>
+</html>
