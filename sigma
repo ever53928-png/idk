@@ -1,0 +1,206 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INVIS HTML // Stealth_v5</title>
+<style>
+:root {
+--bg-color: #050505;
+--panel-bg: #0d0d0d;
+--accent-color: #00ff41;
+--text-color: #d1d1d1;
+--border-style: 1px solid #222;
+}
+
+    body, html {
+        margin: 0; padding: 0; height: 100%;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Courier New', Courier, monospace;
+        overflow: hidden;
+    }
+
+    header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 20px; background: #000; border-bottom: var(--border-style);
+    }
+
+    .logo-section { display: flex; align-items: center; }
+    .logo { height: 35px; margin-right: 12px; filter: drop-shadow(0 0 5px var(--accent-color)); }
+    .title { font-size: 1.1rem; font-weight: bold; letter-spacing: 2px; color: var(--accent-color); }
+
+    .controls { display: flex; gap: 8px; }
+
+    main { display: flex; height: calc(100vh - 52px); }
+
+    .pane { flex: 1; display: flex; flex-direction: column; position: relative; transition: 0.3s; min-width: 0; }
+    .editor-pane { border-right: var(--border-style); }
+    .hidden-editor { flex: 0; width: 0; overflow: hidden; border: none; }
+
+    .label {
+        padding: 8px 15px; background: #111; font-size: 0.7rem; color: #666;
+        border-bottom: var(--border-style); display: flex; justify-content: space-between; align-items: center;
+    }
+
+    textarea {
+        flex: 1; background: var(--panel-bg); color: var(--accent-color);
+        border: none; padding: 20px; font-family: 'Consolas', monospace;
+        font-size: 14px; resize: none; outline: none; line-height: 1.5;
+    }
+
+    #preview-container { flex: 1; background: #1a1a1a; display: flex; justify-content: center; overflow: hidden; }
+    iframe { background: #fff; border: none; width: 100%; height: 100%; }
+
+    #ghost-console {
+        height: 100px; background: #000; border-top: var(--border-style);
+        font-size: 0.7rem; overflow-y: auto; padding: 10px; color: #888;
+    }
+    .log-entry { margin-bottom: 2px; font-family: monospace; border-bottom: 1px solid #111; }
+
+    .hacker-btn {
+        background: transparent; color: var(--accent-color); border: 1px solid var(--accent-color);
+        padding: 4px 10px; cursor: pointer; font-size: 0.65rem; font-family: inherit;
+        transition: 0.15s; text-transform: uppercase;
+    }
+
+    .hacker-btn:hover { background: rgba(0, 255, 65, 0.1); }
+    .active-mode { background: var(--accent-color) !important; color: #000 !important; }
+
+    #file-input { display: none; }
+    .status-tag { font-size: 0.6rem; background: #222; padding: 2px 6px; border-radius: 3px; }
+    
+    select.hacker-btn { background: #000; outline: none; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo-section">
+        <img src="https://cdn.phototourl.com/free/2026-05-01-92c521ef-e1a2-49f4-9bde-e4c2e19d200c.png" alt="Invis Logo" class="logo">
+        <div class="title">INVIS_v5 <span id="mode-indicator" style="font-size: 0.6rem; color: #444;">// UI_CUSTOM</span></div>
+    </div>
+    <div class="controls">
+        <select class="hacker-btn" onchange="document.getElementById('code-editor').style.fontFamily = this.value;">
+            <option value="'Consolas', monospace">FONT: CONSOLAS</option>
+            <option value="'Courier New', Courier, monospace">FONT: COURIER</option>
+            <option value="'Lucida Console', Monaco, monospace">FONT: LUCIDA</option>
+            <option value="monospace">FONT: MONOSPACE</option>
+            <option value="Arial, sans-serif">FONT: ARIAL</option>
+        </select>
+        <button class="hacker-btn" onclick="openInNewTab()">EXTRACT</button>
+        <button class="hacker-btn" id="shield-btn" onclick="toggleShield()">SHIELD: OFF</button>
+        <button class="hacker-btn" onclick="document.getElementById('file-input').click()">LOAD_FILE</button>
+        <button class="hacker-btn" onclick="toggleFullPreview()">FULL</button>
+        <input type="file" id="file-input" accept=".html,.txt" onchange="loadFile(event)">
+    </div>
+</header>
+
+<main>
+    <section class="pane editor-pane" id="editor-container">
+        <div class="label">
+            <span>EDITOR <span id="lag-indicator" class="status-tag">STABLE</span></span>
+            <button class="hacker-btn" style="border-color: #444; color: #666;" onclick="runCode()">INJECT</button>
+        </div>
+        <textarea id="code-editor" spellcheck="false" placeholder="Type here or load a file secretly..." oninput="debounceRun()"></textarea>
+    </section>
+
+    <section class="pane" id="preview-pane">
+        <div class="label">
+            <div style="display:flex; gap: 5px;">
+                <button class="hacker-btn" onclick="resizePreview('375px')">MOB</button>
+                <button class="hacker-btn" onclick="resizePreview('100%')">DSK</button>
+            </div>
+            <span>DATA: <span id="byte-counter" style="color:var(--accent-color)">0</span> B</span>
+        </div>
+        <div id="preview-container">
+            <iframe id="preview-window"></iframe>
+        </div>
+        <div id="ghost-console"></div>
+    </section>
+</main>
+
+<script>
+    const editor = document.getElementById('code-editor');
+    const previewWin = document.getElementById('preview-window');
+    const gConsole = document.getElementById('ghost-console');
+    const byteCounter = document.getElementById('byte-counter');
+    const lagTag = document.getElementById('lag-indicator');
+    
+    let debounceTimer;
+    let activeContent = "";
+
+    function runCode(contentOverride = null) {
+        const code = contentOverride !== null ? contentOverride : editor.value;
+        activeContent = code;
+        lagTag.innerText = "SYNCING...";
+        
+        const consoleScript = `<script>
+            window.onerror = (m) => window.parent.postMessage({t:'err', m:m}, '*');
+            console.log = (...a) => window.parent.postMessage({t:'log', m:a.join(' ')}, '*');
+        <\/script>`;
+
+        const blob = new Blob([consoleScript + code], { type: 'text/html' });
+        previewWin.src = URL.createObjectURL(blob);
+        byteCounter.innerText = new Blob([code]).size.toLocaleString();
+        
+        if (contentOverride === null) localStorage.setItem('invis_save', code);
+        setTimeout(() => { lagTag.innerText = "STABLE"; }, 400);
+    }
+
+    function debounceRun() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => runCode(), 500);
+    }
+
+    function loadFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => { 
+            const fileCode = e.target.result;
+            editor.value = "/* EXTERNAL FILE LOADED: " + file.name + " (SOURCE HIDDEN) */";
+            runCode(fileCode);
+            event.target.value = "";
+        };
+        reader.readAsText(file);
+    }
+
+    function openInNewTab() {
+        const blob = new Blob([activeContent || editor.value], { type: 'text/html' });
+        window.open(URL.createObjectURL(blob), '_blank');
+    }
+
+    function toggleShield() {
+        const container = document.getElementById('editor-container');
+        container.classList.toggle('hidden-editor');
+        const btn = document.getElementById('shield-btn');
+        btn.innerText = container.classList.contains('hidden-editor') ? "SHIELD: ON" : "SHIELD: OFF";
+        btn.classList.toggle('active-mode');
+    }
+
+    function resizePreview(w) { previewWin.style.width = w; }
+
+    window.addEventListener('message', (e) => {
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${e.data.t === 'err' ? 'log-error' : ''}`;
+        entry.innerText = `[${new Date().toLocaleTimeString()}] ${e.data.m}`;
+        gConsole.prepend(entry);
+    });
+
+    function toggleFullPreview() {
+        const p = document.getElementById('preview-pane');
+        if (!document.fullscreenElement) p.requestFullscreen();
+        else document.exitFullscreen();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === "Escape") window.location.href = "[https://google.com](https://google.com)";
+    });
+
+    window.onload = () => {
+        const saved = localStorage.getItem('invis_save');
+        if (saved) { editor.value = saved; runCode(); }
+    };
+</script>
+</body>
+</html>
